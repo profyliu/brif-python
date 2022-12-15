@@ -639,7 +639,10 @@ void set_bit(bitblock_t *x, int k){
     *x |= (1 << (8*sizeof(bitblock_t) - 1 - k));
 }
 
-bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_blocks, int n_cuts){
+bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_blocks, int n_cuts, int nthreads){
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     if(n_cuts == 0) return NULL;
     bitblock_t ** bmat = (bitblock_t**)malloc(n_cuts*sizeof(bitblock_t*));
     for(int c = 0; c < n_cuts; c++){
@@ -648,7 +651,9 @@ bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_block
     }
     int block_num = 0;
     int bit_num = 0;
-    for(int i = 0; i < n; i++){
+    int i;
+    #pragma omp parallel for private(i, block_num, bit_num)
+    for(i = 0; i < n; i++){
         block_num = i / (8*sizeof(bitblock_t));
         bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < n_cuts; c++){
@@ -663,7 +668,10 @@ bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_block
     return(bmat);
 }
 
-bitblock_t ** binarize_factor_index(int *index, int n, int n_blocks, int n_levels, int start_index){
+bitblock_t ** binarize_factor_index(int *index, int n, int n_blocks, int n_levels, int start_index, int nthreads){
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     if(n_levels == 0) return NULL;
     bitblock_t ** bmat = (bitblock_t**)malloc(n_levels*sizeof(bitblock_t*));
     for(int c = 0; c < n_levels; c++){
@@ -672,7 +680,9 @@ bitblock_t ** binarize_factor_index(int *index, int n, int n_blocks, int n_level
     }
     int block_num = 0;
     int bit_num = 0;
-    for(int i = 0; i < n; i++){
+    int i;
+    #pragma omp parallel for private(i, block_num, bit_num)
+    for(i = 0; i < n; i++){
         block_num = i / (8*sizeof(bitblock_t));
         bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < n_levels; c++){
@@ -694,16 +704,19 @@ factor_t * factor_cutpoints(factor_t *f, int n, int *n_cuts){
     }
 }
 
-bitblock_t ** binarize_factor(factor_t *f, int n, int n_blocks, int *n_cuts){    
+bitblock_t ** binarize_factor(factor_t *f, int n, int n_blocks, int *n_cuts, int nthreads){    
     if(f->nlevels <= 1){
         *n_cuts = 0;
         return NULL;
     } else {
-        return binarize_factor_index(f->index, n, n_blocks, f->nlevels, f->start_index);
+        return binarize_factor_index(f->index, n, n_blocks, f->nlevels, f->start_index, nthreads);
     }
 }
 
-bitblock_t ** binarize_integer(integer_t *x, integer_t *cuts, int n, int n_blocks, int n_cuts){
+bitblock_t ** binarize_integer(integer_t *x, integer_t *cuts, int n, int n_blocks, int n_cuts, int nthreads){
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     if(n_cuts == 0) return NULL;
     bitblock_t ** bmat = (bitblock_t**)malloc(n_cuts*sizeof(bitblock_t*));
     for(int c = 0; c < n_cuts; c++){
@@ -712,7 +725,9 @@ bitblock_t ** binarize_integer(integer_t *x, integer_t *cuts, int n, int n_block
     }
     int block_num = 0;
     int bit_num = 0;
-    for(int i = 0; i < n; i++){
+    int i;
+    #pragma omp parallel for private(i, block_num, bit_num)
+    for(i = 0; i < n; i++){
         block_num = i / (8*sizeof(bitblock_t));
         bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < n_cuts; c++){
@@ -734,7 +749,10 @@ void delete_bmat(bitblock_t **bmat, int ncol){
     free(bmat);
 }
 
-ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integer_classes){
+ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integer_classes, int nthreads){
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     ycode_t *yc = (ycode_t*)malloc(sizeof(ycode_t));
     yc->yvalues_num = NULL;
     yc->ycuts_num = NULL;
@@ -781,7 +799,9 @@ ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integ
         }
         int block_num = 0;
         int bit_num = 0;
-        for(int i = 0; i < n; i++){
+        int i;
+        #pragma omp parallel for private(i, block_num, bit_num)
+        for(i = 0; i < n; i++){
             block_num = i / (8*sizeof(bitblock_t));
             bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < n_unique; c++){
@@ -818,7 +838,9 @@ ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integ
         
         int block_num = 0;
         int bit_num = 0;
-        for(int i = 0; i < n; i++){
+        int i;
+        #pragma omp parallel for private(i, block_num, bit_num)
+        for(i = 0; i < n; i++){
             block_num = i / (8*sizeof(bitblock_t));
             bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < maxJ-1; c++){
@@ -838,7 +860,10 @@ ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integ
     return(yc);
 }
 
-ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer_classes){
+ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer_classes, int nthreads){
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     ycode_t *yc = (ycode_t*)malloc(sizeof(ycode_t)); 
     yc->start_index = y->start_index;
     yc->yvalues_num = NULL;
@@ -861,7 +886,9 @@ ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer
     }
     int block_num = 0;
     int bit_num = 0;
-    for(int i = 0; i < n; i++){
+    int i;
+    #pragma omp parallel for private(i, block_num, bit_num)
+    for(i = 0; i < n; i++){
         block_num = i / (8*sizeof(bitblock_t));
         bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < yc->nlevels; c++){
@@ -874,7 +901,10 @@ ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer
     return(yc);
 }
 
-ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integer_classes){
+ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integer_classes, int nthreads){
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     ycode_t *yc = (ycode_t*)malloc(sizeof(ycode_t));
     yc->yvalues_int = NULL;
     yc->ycuts_int = NULL;
@@ -922,7 +952,9 @@ ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integ
         }
         int block_num = 0;
         int bit_num = 0;
-        for(int i = 0; i < n; i++){
+        int i;
+        #pragma omp parallel for private(i, block_num, bit_num)
+        for(i = 0; i < n; i++){
             block_num = i / (8*sizeof(bitblock_t));
             bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < n_unique; c++){
@@ -959,7 +991,9 @@ ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integ
         
         int block_num = 0;
         int bit_num = 0;
-        for(int i = 0; i < n; i++){
+        int i;
+        #pragma omp parallel for private(i, block_num, bit_num)
+        for(i = 0; i < n; i++){
             block_num = i / (8*sizeof(bitblock_t));
             bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < maxJ-1; c++){
@@ -1057,9 +1091,27 @@ int count1s(bitblock_t *x, int n_blocks, int n_discard_bits){
     return(cnt);
 }
 
+
+
+
 double unif_rand(void){
     return((double)rand()/(double)(RAND_MAX+RAND_PAD));
 }
+
+
+
+unsigned long urand(){
+    static unsigned long number;
+    number = 1664525L*number + 1013904223L;
+    return(number); 
+}
+
+/*
+double unif_rand(){
+    return(1.0*urand()/(double) (1.0+ULONG_MAX));
+}
+*/
+
 
 // shuffle the index array of size n in place, only care about the first ps elements
 void shuffle_array_first_ps(int *arr, int n, int ps){
@@ -2025,45 +2077,11 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
 }
 
 
-void predict_tree(dt_node_t *tree, bitblock_t ***bx, int **pred_tree, int J, int n_blocks){
-    if(tree){
-        if(tree->split_var == 0){
-            int i;
-            #pragma omp parallel for
-            for(i = 0; i < n_blocks; i++){
-                bitblock_t test0 = MAXBITBLOCK_VALUE;
-                for(int d = 0; d < tree->depth; d++){
-                    int this_var = tree->rulepath_var[d];
-                    int this_bx = tree->rulepath_bx[d];
-                    if(this_var > 0){
-                        test0 &= bx[this_var][this_bx][i];
-                    } else if(this_var < 0){
-                        test0 &= ~bx[-this_var][this_bx][i];
-                    } else {
-                        //printf("Impossible\n");
-                    }
-                }
-                // set score for the block
-                unsigned bit = 0;
-                for(unsigned k = 1 << (8*sizeof(bitblock_t) - 1); k > 0; k = k / 2){
-                    if(test0 & k){
-                        for(int j = 0; j < J; j++){
-                            pred_tree[j][i*8*sizeof(bitblock_t)+bit] = tree->count[j];
-                        }
-                    }
-                    bit++;
-                }
-            }
-        } else {
-            predict_tree(tree->left, bx, pred_tree, J, n_blocks);
-            predict_tree(tree->right, bx, pred_tree, J, n_blocks);
-        }
-    }
-}
-
 void predict_leaves(dt_leaf_t *leaves, bitblock_t ***bx, int **pred_tree, int J, int n_blocks){
     if(leaves){
-        for(int i = 0; i < n_blocks; i++){
+        int i;
+        #pragma omp parallel for
+        for(i = 0; i < n_blocks; i++){
             bitblock_t test0 = MAXBITBLOCK_VALUE;
             for(int d = 0; d < leaves->depth; d++){
                 int this_var = leaves->rulepath_var[d];
@@ -2094,6 +2112,9 @@ void predict_leaves(dt_leaf_t *leaves, bitblock_t ***bx, int **pred_tree, int J,
 
 void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_method, int nthreads){    
     if(model == NULL || model->ntrees == 0) return;
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     // unpack parameters
     int J = (model->yc)->nlevels;
     int n = bx_new->n;
@@ -2108,23 +2129,26 @@ void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_meth
     }
 
     for(int t = 0; t < model->ntrees; t++){
-        //predict_tree(model->trees[t], bx, pred_tree, J, n_blocks);
         predict_leaves(model->tree_leaves[t], bx, pred_tree, J, n_blocks);
 
         if(vote_method == 0){
-            for(int i = 0; i < n; i++){
-                for(int k = 0; k < J; k++){
+            int i,k;
+            #pragma omp parallel for private(i,k) 
+            for(i = 0; i < n; i++){
+                for(k = 0; k < J; k++){
                     pred[k][i] += pred_tree[k][i];
                 }                
             }
         } else {
             double this_sum = 0;
-            for(int i = 0; i < n; i++){
+            int i,k;
+            #pragma omp parallel for private(i,k,this_sum) 
+            for(i = 0; i < n; i++){
                 this_sum = 0;
-                for(int k = 0; k < J; k++){
+                for(k = 0; k < J; k++){
                     this_sum += pred_tree[k][i];
                 }
-                for(int k = 0; k < J; k++){
+                for(k = 0; k < J; k++){
                     pred[k][i] += 1.0 * pred_tree[k][i] / this_sum;
                 }                
             }
@@ -2136,18 +2160,22 @@ void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_meth
     // average the predictions
     if(vote_method == 0){
         double total_count = 0;
-        for(int i = 0; i < n; i++){
+        int i,k;
+        #pragma omp parallel for private(i,k,total_count)       
+        for(i = 0; i < n; i++){
             total_count = 0;
-            for(int k = 0; k < J; k++){
+            for(k = 0; k < J; k++){
                 total_count += pred[k][i];
             }
-            for(int k = 0; k < J; k++){
+            for(k = 0; k < J; k++){
                 pred[k][i] = pred[k][i] / total_count;
             }
         }
     } else {
-        for(int i = 0; i < n; i++){
-            for(int k = 0; k < J; k++){
+        int i,k;
+        #pragma omp parallel for private(i,k) 
+        for(i = 0; i < n; i++){
+            for(k = 0; k < J; k++){
                 pred[k][i] = pred[k][i] / model->ntrees;
             }
         }        
@@ -2379,7 +2407,7 @@ void make_cuts(data_frame_t *train, rf_model_t **model, int n_numeric_cuts, int 
     (*model)->n_bcols = n_bcols;
 }
 
-bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model){
+bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model, int nthreads){
     int p = train->p;
     int n = train->n;
     int n_blocks = n / (8*sizeof(bitblock_t)) + ((n % (8*sizeof(bitblock_t))) ? 1 : 0);
@@ -2395,14 +2423,14 @@ bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model){
     int this_num_var = 0;
     for(int j = 1; j <= p; j++){
         if(var_types[j] == 'n'){
-            bx[j] = binarize_numeric((numeric_t*)train->data[j], (*model)->numeric_cuts[this_num_var], n, n_blocks, (*model)->n_bcols[j]);
+            bx[j] = binarize_numeric((numeric_t*)train->data[j], (*model)->numeric_cuts[this_num_var], n, n_blocks, (*model)->n_bcols[j], nthreads);
             this_num_var += 1;
         } else if(var_types[j] == 'i'){
-            bx[j] = binarize_integer((integer_t*)train->data[j], (*model)->integer_cuts[this_int_var], n, n_blocks, (*model)->n_bcols[j]);
+            bx[j] = binarize_integer((integer_t*)train->data[j], (*model)->integer_cuts[this_int_var], n, n_blocks, (*model)->n_bcols[j], nthreads);
             this_int_var += 1;
         } else if(var_types[j] == 'f'){
             factor_t *f = (factor_t *)train->data[j];
-            bx[j] = binarize_factor_index(f->index, n, n_blocks, (*model)->n_bcols[j], f->start_index);
+            bx[j] = binarize_factor_index(f->index, n, n_blocks, (*model)->n_bcols[j], f->start_index, nthreads);
         }
     }
     bx_info_t * bxall = (bx_info_t*)malloc(sizeof(bx_info_t));
@@ -2432,20 +2460,20 @@ void delete_bx(bx_info_t *bxall, rf_model_t *model){
     free(bxall);
 }
 
-ycode_t * make_yc(data_frame_t *train, rf_model_t **model, int max_integer_classes){
+ycode_t * make_yc(data_frame_t *train, rf_model_t **model, int max_integer_classes, int nthreads){
     if(train == NULL || *model == NULL || (*model)->n_bcols == NULL) return NULL;
     char *var_types = (*model)->var_types;
     int n = train->n;
     int n_blocks = n / (8*sizeof(bitblock_t)) + ((n % (8*sizeof(bitblock_t))) ? 1 : 0);
     ycode_t *yc = NULL;
     if(var_types[0] == 'i'){
-        yc = codify_integer_target((integer_t*)train->data[0], n, n_blocks, max_integer_classes);
+        yc = codify_integer_target((integer_t*)train->data[0], n, n_blocks, max_integer_classes, nthreads);
         (*model)->n_bcols[0] = yc->nlevels;
     } else if(var_types[0] == 'f'){
-        yc = codify_factor_target((factor_t*)train->data[0], n, n_blocks, max_integer_classes);
+        yc = codify_factor_target((factor_t*)train->data[0], n, n_blocks, max_integer_classes, nthreads);
         (*model)->n_bcols[0] = yc->nlevels;
     } else if(var_types[0] == 'n'){
-        yc = codify_numeric_target((numeric_t*)train->data[0], n, n_blocks, max_integer_classes);
+        yc = codify_numeric_target((numeric_t*)train->data[0], n, n_blocks, max_integer_classes, nthreads);
         (*model)->n_bcols[0] = yc->nlevels;
     } else {
         //printf("var_type wrong.\n");
@@ -2467,15 +2495,23 @@ void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int
         //printf("Model already contains a forest.\n");
         return;
     }
+    // initialize RNG
+    /*
+    srand(seed);
+    int idle_runs = rand() % 100;
+    for(int i = 0; i < idle_runs; i++){
+        urand();
+    }
+    */
+
     dt_node_t **trees = (dt_node_t**)malloc(ntrees*sizeof(dt_node_t*));
     int t;
-    #pragma omp parallel for
+    #pragma omp parallel for 
     for(t = 0; t < ntrees; t++){
-        // if split_search is >= 2, alternate between 0 and 1
         if(split_search >=4){
             split_search = t % 4;
         }
-        srand(seed*17+199933*t);
+        srand((unsigned) ((unsigned) seed)*t*1013904223L);
         trees[t] = build_tree(bxall, yc, *model, ps, max_depth, min_node_size, bagging_method, bagging_proportion, split_search, search_radius);
     }
 
@@ -2506,8 +2542,12 @@ void flatten_model(rf_model_t **model, int nthreads){
         //printf("Cannot flatten model \n");
         return;
     }
+#ifdef _OPENMP
+    omp_set_num_threads(nthreads);
+#endif
     (*model)->tree_leaves = (dt_leaf_t**)malloc((*model)->ntrees*sizeof(dt_leaf_t*));
     int k;
+    #pragma omp parallel for 
     for(k = 0; k < (*model)->ntrees; k++){
         (*model)->tree_leaves[k] = NULL;
         flatten_tree((*model)->trees[k], &((*model)->tree_leaves[k]), (*model)->yc->nlevels);

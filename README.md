@@ -81,9 +81,6 @@ an integer indicating the number of predictors to sample at each node split. Def
 **max_factor_levels**
 an integer. If any factor variables has more than max_factor_levels, the program stops and prompts the user to increase the value of this parameter if the too-many-level factor is indeed intended.
 
-**seed**
-an integer specifying the seed used by the internal random number generator. 
-
 **bagging_method**
 an integer indicating the bagging sampling method: 0 for sampling without replacement; 1 for sampling with replacement (bootstrapping).
 
@@ -95,6 +92,9 @@ an integer indicating the choice of the split search method. 0: randomly pick a 
 
 **search_radius**
 a positive integer indicating the split point search radius. This parameter takes effect only in the self-regulating local search (split_search = 2 or above).
+
+**seed**
+a positive integer, random number generator seed.
 
 **nthreads**
 an integer specifying the number of threads used by the program. This parameter takes effect only on systems supporting OpenMP.

@@ -13,7 +13,7 @@ else:
     extra_link = []
 
 setup(name='brif',
-      version="1.2.3",
+      version="1.2.5",
       ext_modules=[
           Extension('brifc',
                     ['pybrif.c','brif.c'],

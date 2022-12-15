@@ -238,8 +238,8 @@ static PyObject *py_fit(PyObject *self, PyObject *args){
     train_df->data = data;
 
     make_cuts(train_df, &model, n_numeric_cuts, n_integer_cuts); 
-    bx_info_t *bx_train = make_bx(train_df, &model);
-    ycode_t *yc_train = make_yc(train_df, &model, max_integer_classes);
+    bx_info_t *bx_train = make_bx(train_df, &model, nthreads);
+    ycode_t *yc_train = make_yc(train_df, &model, max_integer_classes, nthreads);
     delete_data_py(train_df);  
     PyBuffer_Release(&num_view);
     PyBuffer_Release(&int_view);
@@ -462,7 +462,7 @@ static PyObject *py_predict(PyObject *self, PyObject *args){
     }
 
     int test_n = test_df->n;
-    bx_info_t *bx_test = make_bx(test_df, &model);
+    bx_info_t *bx_test = make_bx(test_df, &model, nthreads);
     delete_data_py(test_df);
     PyBuffer_Release(&num_view);
     PyBuffer_Release(&int_view);
