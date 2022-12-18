@@ -1130,7 +1130,7 @@ void shuffle_array_first_ps(int *arr, int n, int ps){
 }
 
 // find the best split_var and split_bx index; z4 is scratch pad; count, split_var, split_bx contain return values
-void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_node_size, int split_search, dt_node_t * cur_node, bitblock_t *cur, int *bindex, int *uindex, int n_useful_blocks, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *train_count, int *valid_count, int search_radius, int *candidate_index, int *split_var, int* split_bx){
+void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_node_size, int split_search, dt_node_t * cur_node, bitblock_t *useful_cur, int *uindex, int n_useful_blocks, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *train_count, int *valid_count, int search_radius, int *candidate_index, int *split_var, int* split_bx){
     bitblock_t **ymat = yc->ymat;
     bitblock_t ***bx = bxall->bx;
     int J = yc->nlevels;
@@ -1146,7 +1146,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
     // get the count of classes
     for(int k = 0; k < J; k++){
         for(int i=0; i < n_useful_blocks; i++){
-            z4[i] = ymat[k][bindex[uindex[i]]] & cur[uindex[i]];
+            z4[i] = ymat[k][uindex[i]] & useful_cur[i];
         }
         count[k] = count1s(z4, n_useful_blocks, n_discard_bits);
         nobs += count[k]; 
@@ -1197,7 +1197,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 double left_gini;
                 double right_gini;
                 for(int i = 0; i < n_useful_blocks; i++){
-                    z4[i] = cur[uindex[i]] & bx[j][split_index][bindex[uindex[i]]];
+                    z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
                 int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
                 int right_size = nobs - left_size;
@@ -1210,7 +1210,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int cum_child_count = 0;
                 for(int k = 0; k < J - 1; k++){
                     for(int i=0; i < n_useful_blocks; i++){
-                        z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                        z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
                     child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
                     cum_child_count += child_count[k];
@@ -1260,7 +1260,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 split_index = candidate_index[n_tabu_levels + (int)floor(unif_rand() * (nb - n_tabu_levels))];
                 
                 for(int i = 0; i < n_useful_blocks; i++){
-                    z4[i] = cur[uindex[i]] & bx[j][split_index][bindex[uindex[i]]];
+                    z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
                 int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
                 int right_size = nobs - left_size;
@@ -1273,7 +1273,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int cum_child_count = 0;
                 for(int k = 0; k < J - 1; k++){
                     for(int i=0; i < n_useful_blocks; i++){
-                        z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                        z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
                     child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
                     cum_child_count += child_count[k];
@@ -1326,7 +1326,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     double left_gini;
                     double right_gini;
                     for(int i = 0; i < n_useful_blocks; i++){
-                        z4[i] = cur[uindex[i]] & bx[j][trial_index][bindex[uindex[i]]];
+                        z4[i] = useful_cur[i] & bx[j][trial_index][uindex[i]];
                     }
                     int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
                     int right_size = nobs - left_size;
@@ -1339,7 +1339,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     int cum_child_count = 0;
                     for(int k = 0; k < J - 1; k++){
                         for(int i=0; i < n_useful_blocks; i++){
-                            z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                            z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
                         child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
                         cum_child_count += child_count[k];
@@ -1393,7 +1393,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 for(int t = 0; t < a_few; t++){
                     split_index = candidate_index[n_tabu_levels + t];
                     for(int i = 0; i < n_useful_blocks; i++){
-                        z4[i] = cur[uindex[i]] & bx[j][split_index][bindex[uindex[i]]];
+                        z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                     }
                     int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
                     int right_size = nobs - left_size;
@@ -1406,7 +1406,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     int cum_child_count = 0;
                     for(int k = 0; k < J - 1; k++){
                         for(int i=0; i < n_useful_blocks; i++){
-                            z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                            z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
                         child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
                         cum_child_count += child_count[k];
@@ -1442,7 +1442,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
         int nobs_valid = 0;
         for(int k = 0; k < J; k++){
             for(int i=0; i < n_useful_blocks; i++){
-                z4[i] = ymat[k][bindex[uindex[i]]] & cur[uindex[i]];
+                z4[i] = ymat[k][uindex[i]] & useful_cur[i];
             }
             train_count[k] = count1s(z4, n_train_blocks, n_discard_bits);
             nobs_train += train_count[k]; 
@@ -1480,7 +1480,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 double valid_left_gini;
                 double valid_right_gini;
                 for(int i = 0; i < n_useful_blocks; i++){
-                    z4[i] = cur[uindex[i]] & bx[j][split_index][bindex[uindex[i]]];
+                    z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
                 // use first half to train, second half to validate
                 int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
@@ -1509,7 +1509,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int cum_valid_child_count = 0;
                 for(int k = 0; k < J - 1; k++){
                     for(int i=0; i < n_useful_blocks; i++){
-                        z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                        z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
                     // get train part
                     child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
@@ -1613,7 +1613,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 double valid_left_gini;
                 double valid_right_gini;
                 for(int i = 0; i < n_useful_blocks; i++){
-                    z4[i] = cur[uindex[i]] & bx[j][split_index][bindex[uindex[i]]];
+                    z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
                 // use first half to train, second half to validate
                 int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
@@ -1642,7 +1642,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int cum_valid_child_count = 0;
                 for(int k = 0; k < J - 1; k++){
                     for(int i=0; i < n_useful_blocks; i++){
-                        z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                        z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
                     // get train part
                     child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
@@ -1729,7 +1729,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
 
         for(int k = 0; k < J; k++){
             for(int i=0; i < n_useful_blocks; i++){
-                z4[i] = ymat[k][bindex[uindex[i]]] & cur[uindex[i]];
+                z4[i] = ymat[k][uindex[i]] & useful_cur[i];
             }
             train_count[k] = count1s(z4, n_train_blocks, n_discard_bits);
             nobs_train += train_count[k]; 
@@ -1771,7 +1771,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     double valid_left_gini;
                     double valid_right_gini;
                     for(int i = 0; i < n_useful_blocks; i++){
-                        z4[i] = cur[uindex[i]] & bx[j][trial_index][bindex[uindex[i]]];
+                        z4[i] = useful_cur[i] & bx[j][trial_index][uindex[i]];
                     }
                     // use first half to train, second half to validate
                     int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
@@ -1800,7 +1800,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     int cum_valid_child_count = 0;
                     for(int k = 0; k < J - 1; k++){
                         for(int i=0; i < n_useful_blocks; i++){
-                            z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                            z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
                         // get train part
                         child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
@@ -1910,7 +1910,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     double valid_left_gini;
                     double valid_right_gini;
                     for(int i = 0; i < n_useful_blocks; i++){
-                        z4[i] = cur[uindex[i]] & bx[j][split_index][bindex[uindex[i]]];
+                        z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                     }
                     // use first half to train, second half to validate
                     int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
@@ -1939,7 +1939,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     int cum_valid_child_count = 0;
                     for(int k = 0; k < J - 1; k++){
                         for(int i=0; i < n_useful_blocks; i++){
-                            z3[i] = ymat[k][bindex[uindex[i]]] & z4[i];
+                            z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
                         // get train part
                         child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
@@ -2051,6 +2051,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
     bitblock_t *z3 = (bitblock_t*)malloc(n_sampled_blocks*sizeof(bitblock_t));
     bitblock_t *z4 = (bitblock_t*)malloc(n_sampled_blocks*sizeof(bitblock_t));
     bitblock_t *cur = (bitblock_t*)malloc(n_sampled_blocks*sizeof(bitblock_t));
+    bitblock_t *useful_cur = (bitblock_t*)malloc(n_sampled_blocks*sizeof(bitblock_t));
     int *uindex = (int*)malloc(n_sampled_blocks*sizeof(int));
     int *child_count = (int*)malloc(J*sizeof(int));
     int *train_count = NULL;
@@ -2105,11 +2106,12 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
         cur[i] = MAXBITBLOCK_VALUE;  // all bits are 1 (assuming bitblock_t is unsigned int)
     }
     for(int i = 0; i < n_sampled_blocks; i++){
-        uindex[i] = i;
+        uindex[i] = bindex[i];
+        useful_cur[i] = cur[i];
     }
     int n_useful_blocks = n_sampled_blocks;
     shuffle_array_first_ps(var_index, actual_p, ps);
-    find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, cur, bindex, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
+    find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, useful_cur, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
     cur_node->split_var = split_var; 
     cur_node->split_bx = split_bx;
     for(int k = 0; k < J; k++){
@@ -2149,16 +2151,18 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
                 }
             }
         }
-        // elimite the empty (all zero) blocks from further processing
+        // eliminate the empty (all zero) blocks from further processing
         n_useful_blocks = 0;
         for(int i = 0; i < n_sampled_blocks; i++){
             if(cur[i] != 0){
-                uindex[n_useful_blocks++] = i;
+                uindex[n_useful_blocks] = bindex[i];
+                useful_cur[n_useful_blocks] = cur[i];
+                n_useful_blocks++;
             }
         }
         if(cur_node->depth < max_depth && n_useful_blocks >= 2){
             shuffle_array_first_ps(var_index, actual_p, ps);
-            find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, cur, bindex, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
+            find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, useful_cur, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
             cur_node->split_var = split_var; 
             cur_node->split_bx = split_bx;
             for(int k = 0; k < J; k++){
@@ -2168,7 +2172,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
             // get the count of classes
             for(int k = 0; k < J; k++){
                 for(int i = 0; i < n_useful_blocks; i++){
-                    z4[i] = ymat[k][bindex[uindex[i]]] & cur[uindex[i]];
+                    z4[i] = ymat[k][uindex[i]] & useful_cur[i];
                 }
                 cur_node->count[k] = count1s(z4, n_useful_blocks, n_discard_bits);
             }
@@ -2197,16 +2201,18 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
                 }
             }
         }
-        // elimite the empty (all zero) blocks from further processing
+        // eliminate the empty (all zero) blocks from further processing
         n_useful_blocks = 0;
         for(int i = 0; i < n_sampled_blocks; i++){
             if(cur[i] != 0){
-                uindex[n_useful_blocks++] = i;
+                uindex[n_useful_blocks] = bindex[i];
+                useful_cur[n_useful_blocks] = cur[i];
+                n_useful_blocks++;
             }
         }
         if(cur_node->depth < max_depth && n_useful_blocks >= 2){
             shuffle_array_first_ps(var_index, actual_p, ps);
-            find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, cur, bindex, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
+            find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, useful_cur, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
             cur_node->split_var = split_var; 
             cur_node->split_bx = split_bx;
             for(int k = 0; k < J; k++){
@@ -2216,7 +2222,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
             // get the count of classes
             for(int k = 0; k < J; k++){
                 for(int i=0; i < n_useful_blocks; i++){
-                    z4[i] = ymat[k][bindex[uindex[i]]] & cur[uindex[i]];
+                    z4[i] = ymat[k][uindex[i]] & useful_cur[i];
                 }
                 cur_node->count[k] = count1s(z4, n_useful_blocks, n_discard_bits);
             }
@@ -2232,6 +2238,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
     // clean up
     if(candidate_index != NULL) free(candidate_index);
     free(cur);
+    free(useful_cur);
     free(z3);
     free(z4);
     free(uindex);
