@@ -214,7 +214,7 @@ ycode_t * copy_ycode(ycode_t * yc);
 int countSetBits(bitblock_t n);
 int count1s(bitblock_t *x, int n_blocks, int n_discard_bits);
 void shuffle_array_first_ps(int *arr, int n, int ps);
-void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_node_size, int split_search, dt_node_t * cur_node, bitblock_t *cur, int *bindex, int n_sampled_blocks, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *train_count, int *valid_count, int search_radius, int *candidate_index, int *split_var, int* split_bx);
+void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_node_size, int split_search, dt_node_t * cur_node, bitblock_t *cur, int *bindex, int *uindex, int n_useful_blocks, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *train_count, int *valid_count, int search_radius, int *candidate_index, int *split_var, int* split_bx);
 void bootstrap_index_array(int n, int *array);
 dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, int max_depth, int min_node_size, int bagging_method, double bagging_proportion, int split_search, int search_radius);
 void predict_leaves(dt_leaf_t *leaves, bitblock_t ***bx, int **pred_tree, int J, int n_blocks);
