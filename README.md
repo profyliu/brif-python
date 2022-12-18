@@ -15,11 +15,16 @@ For R:
 install.packages('brif')
 ```
 
+To use on Google Colab:
+```python
+!pip install brif
+from brif import brif
+```
 
 # Examples
 
 ```python
-import brif
+from brif import brif
 import pandas as pd
 
 # Create a brif object with default parameters.

@@ -13,7 +13,12 @@ else:
     extra_link = []
 
 setup(name='brif',
-      version="1.2.5",
+      version="1.2.9",
+      description = "Build decision trees and random forests for classification and regression.",
+      author = 'Yanchao Liu',
+      author_email = 'yanchaoliu@wayne.edu',
+      url = 'https://pypi.org/project/brif/',
+      packages = ['brif'],
       ext_modules=[
           Extension('brifc',
                     ['pybrif.c','brif.c'],
