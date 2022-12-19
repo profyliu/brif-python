@@ -649,13 +649,12 @@ bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_block
         bmat[c] = (bitblock_t*)malloc(n_blocks*sizeof(bitblock_t));
         memset(bmat[c], 0, n_blocks*sizeof(bitblock_t));
     }
-    int block_num = 0;
-    int bit_num = 0;
+
     int i;
-    #pragma omp parallel for private(i, block_num, bit_num)
+    #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
     for(i = 0; i < n; i++){
-        block_num = i / (8*sizeof(bitblock_t));
-        bit_num = i % (8*sizeof(bitblock_t));
+        int block_num = i / (8*sizeof(bitblock_t));
+        int bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < n_cuts; c++){
             if(x[i] <= cuts[c]){  // split rule is always in the form of value <= cutpoint
                 for(int cc = c; cc < n_cuts; cc++){
@@ -678,13 +677,12 @@ bitblock_t ** binarize_factor_index(int *index, int n, int n_blocks, int n_level
         bmat[c] = (bitblock_t*)malloc(n_blocks*sizeof(bitblock_t));
         memset(bmat[c], 0, n_blocks*sizeof(bitblock_t));
     }
-    int block_num = 0;
-    int bit_num = 0;
+
     int i;
-    #pragma omp parallel for private(i, block_num, bit_num)
+    #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
     for(i = 0; i < n; i++){
-        block_num = i / (8*sizeof(bitblock_t));
-        bit_num = i % (8*sizeof(bitblock_t));
+        int block_num = i / (8*sizeof(bitblock_t));
+        int bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < n_levels; c++){
             if(index[i] == c+start_index){  // split rule is always in the form of value <= cutpoint
                 set_bit(&bmat[c][block_num], bit_num);
@@ -723,13 +721,12 @@ bitblock_t ** binarize_integer(integer_t *x, integer_t *cuts, int n, int n_block
         bmat[c] = (bitblock_t*)malloc(n_blocks*sizeof(bitblock_t));
         memset(bmat[c], 0, n_blocks*sizeof(bitblock_t));
     }
-    int block_num = 0;
-    int bit_num = 0;
+
     int i;
-    #pragma omp parallel for private(i, block_num, bit_num)
+    #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
     for(i = 0; i < n; i++){
-        block_num = i / (8*sizeof(bitblock_t));
-        bit_num = i % (8*sizeof(bitblock_t));
+        int block_num = i / (8*sizeof(bitblock_t));
+        int bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < n_cuts; c++){
             if(x[i] <= cuts[c]){  // split rule is always in the form of value <= cutpoint
                 for(int cc = c; cc < n_cuts; cc++){
@@ -797,13 +794,12 @@ ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integ
             yc->ymat[c] = (bitblock_t*)malloc(n_blocks*sizeof(bitblock_t));
             memset(yc->ymat[c], 0, n_blocks*sizeof(bitblock_t));
         }
-        int block_num = 0;
-        int bit_num = 0;
+
         int i;
-        #pragma omp parallel for private(i, block_num, bit_num)
+        #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
         for(i = 0; i < n; i++){
-            block_num = i / (8*sizeof(bitblock_t));
-            bit_num = i % (8*sizeof(bitblock_t));
+            int block_num = i / (8*sizeof(bitblock_t));
+            int bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < n_unique; c++){
                 if(y[i] == yc->yvalues_int[c]){  // split rule is always in the form of value <= cutpoint
                     set_bit(&(yc->ymat[c][block_num]), bit_num);
@@ -836,13 +832,11 @@ ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integ
             memset(yc->ymat[c], 0, n_blocks*sizeof(bitblock_t));
         }
         
-        int block_num = 0;
-        int bit_num = 0;
         int i;
-        #pragma omp parallel for private(i, block_num, bit_num)
+        #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
         for(i = 0; i < n; i++){
-            block_num = i / (8*sizeof(bitblock_t));
-            bit_num = i % (8*sizeof(bitblock_t));
+            int block_num = i / (8*sizeof(bitblock_t));
+            int bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < maxJ-1; c++){
                 if(y[i] >= yc->ycuts_int[c] && y[i] < yc->ycuts_int[c+1]){  
                     set_bit(&(yc->ymat[c][block_num]), bit_num);
@@ -884,13 +878,12 @@ ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer
         yc->ymat[c] = (bitblock_t*)malloc(n_blocks*sizeof(bitblock_t));
         memset(yc->ymat[c], 0, n_blocks*sizeof(bitblock_t));
     }
-    int block_num = 0;
-    int bit_num = 0;
+
     int i;
-    #pragma omp parallel for private(i, block_num, bit_num)
+    #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
     for(i = 0; i < n; i++){
-        block_num = i / (8*sizeof(bitblock_t));
-        bit_num = i % (8*sizeof(bitblock_t));
+        int block_num = i / (8*sizeof(bitblock_t));
+        int bit_num = i % (8*sizeof(bitblock_t));
         for(int c = 0; c < yc->nlevels; c++){
             if(y->index[i] == c+y->start_index){  // split rule is always in the form of value <= cutpoint
                 set_bit(&yc->ymat[c][block_num], bit_num);
@@ -950,13 +943,12 @@ ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integ
             yc->ymat[c] = (bitblock_t*)malloc(n_blocks*sizeof(bitblock_t));
             memset(yc->ymat[c], 0, n_blocks*sizeof(bitblock_t));
         }
-        int block_num = 0;
-        int bit_num = 0;
+
         int i;
-        #pragma omp parallel for private(i, block_num, bit_num)
+        #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
         for(i = 0; i < n; i++){
-            block_num = i / (8*sizeof(bitblock_t));
-            bit_num = i % (8*sizeof(bitblock_t));
+            int block_num = i / (8*sizeof(bitblock_t));
+            int bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < n_unique; c++){
                 if(y[i] == yc->yvalues_num[c]){  // split rule is always in the form of value <= cutpoint
                     set_bit(&(yc->ymat[c][block_num]), bit_num);
@@ -989,13 +981,11 @@ ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integ
             memset(yc->ymat[c], 0, n_blocks*sizeof(bitblock_t));
         }
         
-        int block_num = 0;
-        int bit_num = 0;
         int i;
-        #pragma omp parallel for private(i, block_num, bit_num)
+        #pragma omp parallel for schedule(static, 8*sizeof(bitblock_t))
         for(i = 0; i < n; i++){
-            block_num = i / (8*sizeof(bitblock_t));
-            bit_num = i % (8*sizeof(bitblock_t));
+            int block_num = i / (8*sizeof(bitblock_t));
+            int bit_num = i % (8*sizeof(bitblock_t));
             for(int c = 0; c < maxJ-1; c++){
                 if(y[i] >= yc->ycuts_num[c] && y[i] < yc->ycuts_num[c+1]){  
                     set_bit(&(yc->ymat[c][block_num]), bit_num);
@@ -2117,7 +2107,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
     for(int k = 0; k < J; k++){
         cur_node->count[k] = count[k];
     }
-    if(cur_node->split_var!=0 && cur_node->depth < max_depth){
+    if(cur_node->split_var!=0 && cur_node->depth < max_depth && ((split_search >= 2 && n_useful_blocks >= 2) || split_search < 2)){
         // put the node in queue
         queue[tail++] = cur_node;
     }
@@ -2160,7 +2150,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
                 n_useful_blocks++;
             }
         }
-        if(cur_node->depth < max_depth && n_useful_blocks >= 2){
+        if(cur_node->depth < max_depth && ((split_search >= 2 && n_useful_blocks >= 2) || split_search < 2)){
             shuffle_array_first_ps(var_index, actual_p, ps);
             find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, useful_cur, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
             cur_node->split_var = split_var; 
@@ -2210,7 +2200,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
                 n_useful_blocks++;
             }
         }
-        if(cur_node->depth < max_depth && n_useful_blocks >= 2){
+        if(cur_node->depth < max_depth && ((split_search >= 2 && n_useful_blocks >= 2) || split_search < 2)){
             shuffle_array_first_ps(var_index, actual_p, ps);
             find_best_split(bxall, yc, model, min_node_size, split_search, cur_node, useful_cur, uindex, n_useful_blocks, var_index, actual_ps, z3, z4, count, child_count, train_count, valid_count, search_radius, candidate_index, &split_var, &split_bx);
             cur_node->split_var = split_var; 
@@ -2257,7 +2247,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
 void predict_leaves(dt_leaf_t *leaves, bitblock_t ***bx, int **pred_tree, int J, int n_blocks){
     if(leaves){
         int i;
-        #pragma omp parallel for
+        #pragma omp parallel for 
         for(i = 0; i < n_blocks; i++){
             bitblock_t test0 = MAXBITBLOCK_VALUE;
             for(int d = 0; d < leaves->depth; d++){
@@ -2309,23 +2299,22 @@ void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_meth
         predict_leaves(model->tree_leaves[t], bx, pred_tree, J, n_blocks);
 
         if(vote_method == 0){
-            int i,k;
-            #pragma omp parallel for private(i,k) 
+            int i;
+            #pragma omp parallel for
             for(i = 0; i < n; i++){
-                for(k = 0; k < J; k++){
+                for(int k = 0; k < J; k++){
                     pred[k][i] += pred_tree[k][i];
                 }                
             }
         } else {
-            double this_sum = 0;
-            int i,k;
-            #pragma omp parallel for private(i,k,this_sum) 
+            int i;
+            #pragma omp parallel for
             for(i = 0; i < n; i++){
-                this_sum = 0;
-                for(k = 0; k < J; k++){
+                double this_sum = 0;
+                for(int k = 0; k < J; k++){
                     this_sum += pred_tree[k][i];
                 }
-                for(k = 0; k < J; k++){
+                for(int k = 0; k < J; k++){
                     pred[k][i] += 1.0 * pred_tree[k][i] / this_sum;
                 }                
             }
@@ -2336,23 +2325,22 @@ void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_meth
     
     // average the predictions
     if(vote_method == 0){
-        double total_count = 0;
-        int i,k;
-        #pragma omp parallel for private(i,k,total_count)       
+        int i;
+        #pragma omp parallel for 
         for(i = 0; i < n; i++){
-            total_count = 0;
-            for(k = 0; k < J; k++){
+            double total_count = 0;
+            for(int k = 0; k < J; k++){
                 total_count += pred[k][i];
             }
-            for(k = 0; k < J; k++){
+            for(int k = 0; k < J; k++){
                 pred[k][i] = pred[k][i] / total_count;
             }
         }
     } else {
-        int i,k;
-        #pragma omp parallel for private(i,k) 
+        int i;
+        #pragma omp parallel for
         for(i = 0; i < n; i++){
-            for(k = 0; k < J; k++){
+            for(int k = 0; k < J; k++){
                 pred[k][i] = pred[k][i] / model->ntrees;
             }
         }        
@@ -2683,7 +2671,7 @@ void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int
 
     dt_node_t **trees = (dt_node_t**)malloc(ntrees*sizeof(dt_node_t*));
     int t;
-    #pragma omp parallel for 
+    #pragma omp parallel for schedule(static, 4)
     for(t = 0; t < ntrees; t++){
         if(split_search >=4){
             split_search = t % 4;
