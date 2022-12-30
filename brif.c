@@ -1,4 +1,14 @@
 #include "brif.h"
+#define LOOKUP 65536
+
+int lookup_initialized = 0;
+unsigned char SetBitTable[LOOKUP] = {0};
+
+void fillSetBitTable(unsigned char table[], int n){
+    for(int i = 0; i < n; i++){
+        table[i] = (i & 1) + table[i / 2];
+    }
+}
 
 // branch means which branch this node is of its parent 
 dt_node_t* newNode(dt_node_t* parent, int J, unsigned branch){
@@ -1067,25 +1077,16 @@ int countSetBits(bitblock_t n){
 }
 
 // n_discard_bits are guaranteed 0 by previous steps, so ignore it
-int count1s(bitblock_t *x, int n_blocks, int n_discard_bits){
+// assuming bitblock_t is 4 bytes
+int count1s(bitblock_t *x, int n_blocks){
     int cnt = 0;
-    /*
-    if(n_discard_bits){
-        for(int i = 0; i < n_blocks-1; i++){
-            cnt += countSetBits(x[i]);
-        }
-        cnt += countSetBits(x[n_blocks-1] >> n_discard_bits);
-    } else {
-    */
-        for(int i = 0; i < n_blocks; i++){
-            cnt += countSetBits(x[i]);
-        }
-    /*
+    for(int i = 0; i < n_blocks; i++){
+        //cnt += countSetBits(x[i]);
+        //cnt += (int) (SetBitTable[x[i] & 0xff] + SetBitTable[(x[i] >> 8) & 0xff] + SetBitTable[(x[i] >> 16) & 0xff] + SetBitTable[(x[i] >> 24) & 0xff]);
+        cnt += (int) (SetBitTable[x[i] & 0xffff] + SetBitTable[(x[i] >> 16) & 0xffff]);
     }
-    */
     return(cnt);
 }
-
 
 
 
@@ -1110,9 +1111,9 @@ double unif_rand(){
 
 // shuffle the index array of size n in place, only care about the first ps elements
 void shuffle_array_first_ps(int *arr, int n, int ps){
-    int temp;
+    int temp, index;
     for(int k = 0; k < MIN(n, ps); k++){
-        int index = k + (int)floor(unif_rand()*(n - k));
+        index = k + rand()%(n - k);
         temp = arr[k];
         arr[k] = arr[index];
         arr[index] = temp;
@@ -1125,20 +1126,22 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
     bitblock_t ***bx = bxall->bx;
     int J = yc->nlevels;
     int ps = actual_ps;
-    int n_discard_bits = bxall->n_discard_bits;
     int depth = cur_node->depth;
     int *path_var = cur_node->rulepath_var;
     int *path_bx = cur_node->rulepath_bx;
     int *n_bcols = model->n_bcols;
     char *var_types = model->var_types;
     int nobs = 0;  // number of cases in the current node
+    register double tmp = 0;  // temp value
+    register double left_gini, right_gini;
+    register int left_size, right_size, cum_child_count, n_tabu_levels, pass;
 
     // get the count of classes
     for(int k = 0; k < J; k++){
         for(int i=0; i < n_useful_blocks; i++){
             z4[i] = ymat[k][uindex[i]] & useful_cur[i];
         }
-        count[k] = count1s(z4, n_useful_blocks, n_discard_bits);
+        count[k] = count1s(z4, n_useful_blocks);
         nobs += count[k]; 
     }
     // if this node is pure, stop splitting
@@ -1183,33 +1186,35 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 if(lower_index >= upper_index){
                     continue;  // this var cannot be used
                 }
-                split_index = lower_index + (int) floor(unif_rand() * (upper_index - lower_index));  // take a random point
-                double left_gini;
-                double right_gini;
+                split_index = lower_index + rand() % (upper_index - lower_index);  // take a random point
                 for(int i = 0; i < n_useful_blocks; i++){
                     z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
-                int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
-                int right_size = nobs - left_size;
+                left_size = count1s(z4, n_useful_blocks);
+                right_size = nobs - left_size;
                 if(left_size < min_node_size || right_size < min_node_size){
                     continue;  
                 }
                 left_gini = 1;
                 right_gini = 1;
                 // calculate would-be counts for each class in the left node
-                int cum_child_count = 0;
+                cum_child_count = 0;
                 for(int k = 0; k < J - 1; k++){
                     for(int i=0; i < n_useful_blocks; i++){
                         z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
-                    child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
+                    child_count[k] = count1s(z3, n_useful_blocks);
                     cum_child_count += child_count[k];
-                    left_gini -= (1.0*child_count[k]/left_size)*(1.0*child_count[k]/left_size);
-                    right_gini -= (1.0*(count[k] - child_count[k])/right_size)*(1.0*(count[k] - child_count[k])/right_size);
+                    tmp = ((double)child_count[k])/left_size;
+                    left_gini -= tmp*tmp;
+                    tmp = ((double)(count[k] - child_count[k]))/right_size;
+                    right_gini -= tmp*tmp;
                 } 
                 // do the last k (i.e., k = J-1)
-                left_gini -= (1.0*(left_size - cum_child_count)/left_size)*(1.0*(left_size - cum_child_count)/left_size);
-                right_gini -= (1.0*(count[J-1] - left_size + cum_child_count)/right_size)*(1.0*(count[J-1] - left_size + cum_child_count)/right_size);
+                tmp = ((double)(left_size - cum_child_count))/left_size;
+                left_gini -= tmp*tmp;
+                tmp = ((double)(count[J-1] - left_size + cum_child_count))/right_size;
+                right_gini -= tmp*tmp;
 
                 total_gini = (1.0*left_size/nobs)*left_gini + (1.0*right_size/nobs)*right_gini;  
                 if(total_gini < best_gini){
@@ -1218,8 +1223,8 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     best_gini = total_gini;
                 }    
             } else if(var_types[j] == 'f'){
-                int n_tabu_levels = 0;
-                int pass = 0;
+                n_tabu_levels = 0;
+                pass = 0;
                 for(int d = 0; d < depth; d++){
                     if(path_var[d] == j){
                         pass = 1; 
@@ -1247,32 +1252,36 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     }
                 }
                 // randomly sample an available index
-                split_index = candidate_index[n_tabu_levels + (int)floor(unif_rand() * (nb - n_tabu_levels))];
+                split_index = candidate_index[n_tabu_levels + rand() % (nb - n_tabu_levels)];
                 
                 for(int i = 0; i < n_useful_blocks; i++){
                     z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
-                int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
-                int right_size = nobs - left_size;
+                left_size = count1s(z4, n_useful_blocks);
+                right_size = nobs - left_size;
                 if(left_size < min_node_size || right_size < min_node_size){
                     continue;
                 }
-                double left_gini = 1;
-                double right_gini = 1;
+                left_gini = 1;
+                right_gini = 1;
                 // calculate would-be counts for each class in the left node
-                int cum_child_count = 0;
+                cum_child_count = 0;
                 for(int k = 0; k < J - 1; k++){
                     for(int i=0; i < n_useful_blocks; i++){
                         z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
-                    child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
+                    child_count[k] = count1s(z3, n_useful_blocks);
                     cum_child_count += child_count[k];
-                    left_gini -= (1.0*child_count[k]/left_size)*(1.0*child_count[k]/left_size);
-                    right_gini -= (1.0*(count[k] - child_count[k])/right_size)*(1.0*(count[k] - child_count[k])/right_size);
+                    tmp = (double)child_count[k]/left_size;
+                    left_gini -= tmp*tmp;
+                    tmp = ((double)(count[k] - child_count[k]))/right_size;
+                    right_gini -= tmp*tmp;
                 } 
                 // do the last k (i.e., k = J-1)
-                left_gini -= (1.0*(left_size - cum_child_count)/left_size)*(1.0*(left_size - cum_child_count)/left_size);
-                right_gini -= (1.0*(count[J-1] - left_size + cum_child_count)/right_size)*(1.0*(count[J-1] - left_size + cum_child_count)/right_size);
+                tmp = ((double)(left_size - cum_child_count))/left_size;
+                left_gini -= tmp*tmp;
+                tmp = ((double)(count[J-1] - left_size + cum_child_count))/right_size;
+                right_gini -= tmp*tmp;
 
                 total_gini = (1.0*left_size/nobs)*left_gini + (1.0*right_size/nobs)*right_gini;
                 if(total_gini < best_gini){
@@ -1313,32 +1322,34 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int neighbor_lo = MAX(mid_index - search_radius, lower_index);
                 int neighbor_up = MIN(mid_index + search_radius, upper_index);
                 for(int trial_index = neighbor_lo; trial_index < neighbor_up; trial_index++){
-                    double left_gini;
-                    double right_gini;
                     for(int i = 0; i < n_useful_blocks; i++){
                         z4[i] = useful_cur[i] & bx[j][trial_index][uindex[i]];
                     }
-                    int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
-                    int right_size = nobs - left_size;
+                    left_size = count1s(z4, n_useful_blocks);
+                    right_size = nobs - left_size;
                     if(left_size < min_node_size || right_size < min_node_size){
                         continue;  
                     }
                     left_gini = 1;
                     right_gini = 1;
                     // calculate would-be counts for each class in the left node
-                    int cum_child_count = 0;
+                    cum_child_count = 0;
                     for(int k = 0; k < J - 1; k++){
                         for(int i=0; i < n_useful_blocks; i++){
                             z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
-                        child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
+                        child_count[k] = count1s(z3, n_useful_blocks);
                         cum_child_count += child_count[k];
-                        left_gini -= (1.0*child_count[k]/left_size)*(1.0*child_count[k]/left_size);
-                        right_gini -= (1.0*(count[k] - child_count[k])/right_size)*(1.0*(count[k] - child_count[k])/right_size);
+                        tmp = (double)child_count[k]/left_size;
+                        left_gini -= tmp*tmp;
+                        tmp = (double)(count[k] - child_count[k])/right_size;
+                        right_gini -= tmp*tmp;
                     } 
                     // do the last k (i.e., k = J-1)
-                    left_gini -= (1.0*(left_size - cum_child_count)/left_size)*(1.0*(left_size - cum_child_count)/left_size);
-                    right_gini -= (1.0*(count[J-1] - left_size + cum_child_count)/right_size)*(1.0*(count[J-1] - left_size + cum_child_count)/right_size);
+                    tmp = (double)(left_size - cum_child_count)/left_size;
+                    left_gini -= tmp*tmp;
+                    tmp = (double)(count[J-1] - left_size + cum_child_count)/right_size;
+                    right_gini -= tmp*tmp;
 
                     total_gini = (1.0*left_size/nobs)*left_gini + (1.0*right_size/nobs)*right_gini;  
                     if(total_gini < best_gini){
@@ -1348,8 +1359,8 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     }    
                 }
             } else if(var_types[j] == 'f'){
-                int n_tabu_levels = 0;
-                int pass = 0;
+                n_tabu_levels = 0;
+                pass = 0;
                 for(int d = 0; d < depth; d++){
                     if(path_var[d] == j){
                         pass = 1; 
@@ -1385,27 +1396,31 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     for(int i = 0; i < n_useful_blocks; i++){
                         z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                     }
-                    int left_size = count1s(z4, n_useful_blocks, n_discard_bits);
-                    int right_size = nobs - left_size;
+                    left_size = count1s(z4, n_useful_blocks);
+                    right_size = nobs - left_size;
                     if(left_size < min_node_size || right_size < min_node_size){
                         continue;
                     }
-                    double left_gini = 1;
-                    double right_gini = 1;
+                    left_gini = 1;
+                    right_gini = 1;
                     // calculate would-be counts for each class in the left node
-                    int cum_child_count = 0;
+                    cum_child_count = 0;
                     for(int k = 0; k < J - 1; k++){
                         for(int i=0; i < n_useful_blocks; i++){
                             z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
-                        child_count[k] = count1s(z3, n_useful_blocks, n_discard_bits);
+                        child_count[k] = count1s(z3, n_useful_blocks);
                         cum_child_count += child_count[k];
-                        left_gini -= (1.0*child_count[k]/left_size)*(1.0*child_count[k]/left_size);
-                        right_gini -= (1.0*(count[k] - child_count[k])/right_size)*(1.0*(count[k] - child_count[k])/right_size);
+                        tmp = (double)child_count[k]/left_size;
+                        left_gini -= tmp*tmp;
+                        tmp = (double)(count[k] - child_count[k])/right_size;
+                        right_gini -= tmp*tmp;
                     } 
                     // do the last k (i.e., k = J-1)
-                    left_gini -= (1.0*(left_size - cum_child_count)/left_size)*(1.0*(left_size - cum_child_count)/left_size);
-                    right_gini -= (1.0*(count[J-1] - left_size + cum_child_count)/right_size)*(1.0*(count[J-1] - left_size + cum_child_count)/right_size);
+                    tmp = (double)(left_size - cum_child_count)/left_size;
+                    left_gini -= tmp*tmp;
+                    tmp = (double)(count[J-1] - left_size + cum_child_count)/right_size;
+                    right_gini -= tmp*tmp;
 
                     total_gini = (1.0*left_size/nobs)*left_gini + (1.0*right_size/nobs)*right_gini;
                     if(total_gini < best_gini){
@@ -1421,7 +1436,8 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
         // Use half data to evaluate gini and use the other half to test label prediction
         // If the majority class on the validation set does not agree with that on the training set, abandon the candidate split
         double best_gini = 1e10;  // avg gini after the split, the smaller the better
-        
+        register double train_left_gini, train_right_gini, valid_left_gini, valid_right_gini;
+        register int train_left_size, train_right_size, valid_left_size, valid_right_size;
         int n_train_blocks = n_useful_blocks / 2;
         int n_valid_blocks = n_useful_blocks - n_train_blocks;
         // get the count of classes for the training half and validation half separately    
@@ -1434,9 +1450,9 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
             for(int i=0; i < n_useful_blocks; i++){
                 z4[i] = ymat[k][uindex[i]] & useful_cur[i];
             }
-            train_count[k] = count1s(z4, n_train_blocks, n_discard_bits);
+            train_count[k] = count1s(z4, n_train_blocks);
             nobs_train += train_count[k]; 
-            valid_count[k] = count1s(z4+n_train_blocks, n_valid_blocks, n_discard_bits);
+            valid_count[k] = count1s(z4+n_train_blocks, n_valid_blocks);
             nobs_valid += valid_count[k];
         }
 
@@ -1464,19 +1480,16 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     continue;  // this var cannot be used
                 }
 
-                split_index = lower_index + (int) floor(unif_rand() * (upper_index - lower_index));  // take a random point
-                double train_left_gini;
-                double train_right_gini;
-                double valid_left_gini;
-                double valid_right_gini;
+                split_index = lower_index + rand() % (upper_index - lower_index);  // take a random point
+
                 for(int i = 0; i < n_useful_blocks; i++){
                     z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
                 // use first half to train, second half to validate
-                int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
-                int train_right_size = nobs_train - train_left_size;
-                int valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks, n_discard_bits);
-                int valid_right_size = nobs_valid - valid_left_size;
+                train_left_size = count1s(z4, n_train_blocks);
+                train_right_size = nobs_train - train_left_size;
+                valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks);
+                valid_right_size = nobs_valid - valid_left_size;
 
                 if(train_left_size < min_node_size || train_right_size < min_node_size
                     || valid_left_size < min_node_size || valid_right_size < min_node_size){
@@ -1502,10 +1515,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                         z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
                     // get train part
-                    child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
+                    child_count[k] = count1s(z3, n_train_blocks);
                     cum_train_child_count += child_count[k];
-                    train_left_gini -= (1.0*child_count[k]/train_left_size)*(1.0*child_count[k]/train_left_size);
-                    train_right_gini -= (1.0*(train_count[k] - child_count[k])/train_right_size)*(1.0*(train_count[k] - child_count[k])/train_right_size);
+                    tmp = (double)child_count[k]/train_left_size;
+                    train_left_gini -= tmp*tmp;
+                    tmp = (double)(train_count[k] - child_count[k])/train_right_size;
+                    train_right_gini -= tmp*tmp;
                     if(child_count[k] > train_left_max){
                         train_left_max = child_count[k];
                         train_left_label = k;
@@ -1515,10 +1530,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                         train_right_label = k;
                     }
                     // get valid part
-                    child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks, n_discard_bits);
+                    child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks);
                     cum_valid_child_count += child_count[k];
-                    valid_left_gini -= (1.0*child_count[k]/valid_left_size)*(1.0*child_count[k]/valid_left_size);
-                    valid_right_gini -= (1.0*(valid_count[k] - child_count[k])/valid_right_size)*(1.0*(valid_count[k] - child_count[k])/valid_right_size);
+                    tmp = (double)child_count[k]/valid_left_size;
+                    valid_left_gini -= tmp*tmp;
+                    tmp = (double)(valid_count[k] - child_count[k])/valid_right_size;
+                    valid_right_gini -= tmp*tmp;
                     if(child_count[k] > valid_left_max){
                         valid_left_max = child_count[k];
                         valid_left_label = k;
@@ -1533,8 +1550,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int last_k_left_valid_count = valid_left_size - cum_valid_child_count;
                 int last_k_right_train_count = train_count[J-1] - last_k_left_train_count;
                 int last_k_right_valid_count = valid_count[J-1] - last_k_left_valid_count;
-                train_left_gini -= (1.0*last_k_left_train_count/train_left_size)*(1.0*last_k_left_train_count/train_left_size);
-                train_right_gini -= (1.0*last_k_right_train_count/train_right_size)*(1.0*last_k_right_train_count/train_right_size);
+                tmp = (double)last_k_left_train_count/train_left_size;
+                train_left_gini -= tmp*tmp;
+                tmp = (double)last_k_right_train_count/train_right_size;
+                train_right_gini -= tmp*tmp;
                 if(last_k_left_train_count > train_left_max){
                     train_left_max = last_k_left_train_count;
                     train_left_label = J-1;
@@ -1543,8 +1562,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     train_right_max = last_k_right_train_count;
                     train_right_label = J-1;
                 }
-                valid_left_gini -= (1.0*last_k_left_valid_count/valid_left_size)*(1.0*last_k_left_valid_count/valid_left_size);
-                valid_right_gini -= (1.0*last_k_right_valid_count/valid_right_size)*(1.0*last_k_right_valid_count/valid_right_size);
+                tmp = (double)last_k_left_valid_count/valid_left_size;
+                valid_left_gini -= tmp*tmp;
+                tmp = (double)last_k_right_valid_count/valid_right_size;
+                valid_right_gini -= tmp*tmp;
                 if(last_k_left_valid_count > valid_left_max){
                     valid_left_max = last_k_left_valid_count;
                     valid_left_label = J-1;
@@ -1568,8 +1589,8 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 }
                 
             } else if(var_types[j] == 'f'){
-                int n_tabu_levels = 0;
-                int pass = 0;
+                n_tabu_levels = 0;
+                pass = 0;
                 for(int d = 0; d < depth; d++){
                     if(path_var[d] == j){
                         pass = 1; 
@@ -1597,19 +1618,15 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     }
                 }
                 // randomly sample an available index
-                split_index = candidate_index[n_tabu_levels + (int)floor(unif_rand() * (nb - n_tabu_levels))];
-                double train_left_gini;
-                double train_right_gini;
-                double valid_left_gini;
-                double valid_right_gini;
+                split_index = candidate_index[n_tabu_levels + rand() % (nb - n_tabu_levels)];
                 for(int i = 0; i < n_useful_blocks; i++){
                     z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                 }
                 // use first half to train, second half to validate
-                int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
-                int train_right_size = nobs_train - train_left_size;
-                int valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks, n_discard_bits);
-                int valid_right_size = nobs_valid - valid_left_size;
+                train_left_size = count1s(z4, n_train_blocks);
+                train_right_size = nobs_train - train_left_size;
+                valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks);
+                valid_right_size = nobs_valid - valid_left_size;
 
                 if(train_left_size < min_node_size || train_right_size < min_node_size
                     || valid_left_size < min_node_size || valid_right_size < min_node_size){
@@ -1635,10 +1652,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                         z3[i] = ymat[k][uindex[i]] & z4[i];
                     }
                     // get train part
-                    child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
+                    child_count[k] = count1s(z3, n_train_blocks);
                     cum_train_child_count += child_count[k];
-                    train_left_gini -= (1.0*child_count[k]/train_left_size)*(1.0*child_count[k]/train_left_size);
-                    train_right_gini -= (1.0*(train_count[k] - child_count[k])/train_right_size)*(1.0*(train_count[k] - child_count[k])/train_right_size);
+                    tmp = (double)child_count[k]/train_left_size;
+                    train_left_gini -= tmp*tmp;
+                    tmp = (double)(train_count[k] - child_count[k])/train_right_size;
+                    train_right_gini -= tmp*tmp;
                     if(child_count[k] > train_left_max){
                         train_left_max = child_count[k];
                         train_left_label = k;
@@ -1648,10 +1667,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                         train_right_label = k;
                     }
                     // get valid part
-                    child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks, n_discard_bits);
+                    child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks);
                     cum_valid_child_count += child_count[k];
-                    valid_left_gini -= (1.0*child_count[k]/valid_left_size)*(1.0*child_count[k]/valid_left_size);
-                    valid_right_gini -= (1.0*(valid_count[k] - child_count[k])/valid_right_size)*(1.0*(valid_count[k] - child_count[k])/valid_right_size);
+                    tmp = (double)child_count[k]/valid_left_size;
+                    valid_left_gini -= tmp*tmp;
+                    tmp = (double)(valid_count[k] - child_count[k])/valid_right_size;
+                    valid_right_gini -= tmp*tmp;
                     if(child_count[k] > valid_left_max){
                         valid_left_max = child_count[k];
                         valid_left_label = k;
@@ -1667,8 +1688,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int last_k_left_valid_count = valid_left_size - cum_valid_child_count;
                 int last_k_right_train_count = train_count[J-1] - last_k_left_train_count;
                 int last_k_right_valid_count = valid_count[J-1] - last_k_left_valid_count;
-                train_left_gini -= (1.0*last_k_left_train_count/train_left_size)*(1.0*last_k_left_train_count/train_left_size);
-                train_right_gini -= (1.0*last_k_right_train_count/train_right_size)*(1.0*last_k_right_train_count/train_right_size);
+                tmp = (double)last_k_left_train_count/train_left_size;
+                train_left_gini -= tmp*tmp;
+                tmp = (double)last_k_right_train_count/train_right_size;
+                train_right_gini -= tmp*tmp;
                 if(last_k_left_train_count > train_left_max){
                     train_left_max = last_k_left_train_count;
                     train_left_label = J-1;
@@ -1677,8 +1700,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     train_right_max = last_k_right_train_count;
                     train_right_label = J-1;
                 }
-                valid_left_gini -= (1.0*last_k_left_valid_count/valid_left_size)*(1.0*last_k_left_valid_count/valid_left_size);
-                valid_right_gini -= (1.0*last_k_right_valid_count/valid_right_size)*(1.0*last_k_right_valid_count/valid_right_size);
+                tmp = (double)last_k_left_valid_count/valid_left_size;
+                valid_left_gini -= tmp*tmp;
+                tmp = (double)last_k_right_valid_count/valid_right_size;
+                valid_right_gini -= tmp*tmp;
                 if(last_k_left_valid_count > valid_left_max){
                     valid_left_max = last_k_left_valid_count;
                     valid_left_label = J-1;
@@ -1707,7 +1732,8 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
         // Use half data to evaluate gini and use the other half to test label prediction
         // If the majority class on the validation set does not agree with that on the training set, abandon the candidate split
         double best_gini = 1e10;  // avg gini after the split, the smaller the better
-        
+        register double train_left_gini, train_right_gini, valid_left_gini, valid_right_gini;
+        register int train_left_size, train_right_size, valid_left_size, valid_right_size;
         int n_train_blocks = n_useful_blocks / 2;
         int n_valid_blocks = n_useful_blocks - n_train_blocks;
         // get the count of classes for the training half and validation half separately    
@@ -1721,9 +1747,9 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
             for(int i=0; i < n_useful_blocks; i++){
                 z4[i] = ymat[k][uindex[i]] & useful_cur[i];
             }
-            train_count[k] = count1s(z4, n_train_blocks, n_discard_bits);
+            train_count[k] = count1s(z4, n_train_blocks);
             nobs_train += train_count[k]; 
-            valid_count[k] = count1s(z4+n_train_blocks, n_valid_blocks, n_discard_bits);
+            valid_count[k] = count1s(z4+n_train_blocks, n_valid_blocks);
             nobs_valid += valid_count[k];
         }
 
@@ -1756,18 +1782,14 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 int neighbor_lo = MAX(mid_index - search_radius, lower_index);
                 int neighbor_up = MIN(mid_index + search_radius, upper_index);
                 for(int trial_index = neighbor_lo; trial_index < neighbor_up; trial_index++){
-                    double train_left_gini;
-                    double train_right_gini;
-                    double valid_left_gini;
-                    double valid_right_gini;
                     for(int i = 0; i < n_useful_blocks; i++){
                         z4[i] = useful_cur[i] & bx[j][trial_index][uindex[i]];
                     }
                     // use first half to train, second half to validate
-                    int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
-                    int train_right_size = nobs_train - train_left_size;
-                    int valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks, n_discard_bits);
-                    int valid_right_size = nobs_valid - valid_left_size;
+                    train_left_size = count1s(z4, n_train_blocks);
+                    train_right_size = nobs_train - train_left_size;
+                    valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks);
+                    valid_right_size = nobs_valid - valid_left_size;
 
                     if(train_left_size < min_node_size || train_right_size < min_node_size
                         || valid_left_size < min_node_size || valid_right_size < min_node_size){
@@ -1793,10 +1815,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                             z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
                         // get train part
-                        child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
+                        child_count[k] = count1s(z3, n_train_blocks);
                         cum_train_child_count += child_count[k];
-                        train_left_gini -= (1.0*child_count[k]/train_left_size)*(1.0*child_count[k]/train_left_size);
-                        train_right_gini -= (1.0*(train_count[k] - child_count[k])/train_right_size)*(1.0*(train_count[k] - child_count[k])/train_right_size);
+                        tmp = (double)child_count[k]/train_left_size;
+                        train_left_gini -= tmp*tmp;
+                        tmp = (double)(train_count[k] - child_count[k])/train_right_size;
+                        train_right_gini -= tmp*tmp;
                         if(child_count[k] > train_left_max){
                             train_left_max = child_count[k];
                             train_left_label = k;
@@ -1806,10 +1830,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                             train_right_label = k;
                         }
                         // get valid part
-                        child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks, n_discard_bits);
+                        child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks);
                         cum_valid_child_count += child_count[k];
-                        valid_left_gini -= (1.0*child_count[k]/valid_left_size)*(1.0*child_count[k]/valid_left_size);
-                        valid_right_gini -= (1.0*(valid_count[k] - child_count[k])/valid_right_size)*(1.0*(valid_count[k] - child_count[k])/valid_right_size);
+                        tmp = (double)child_count[k]/valid_left_size;
+                        valid_left_gini -= tmp*tmp;
+                        tmp = (double)(valid_count[k] - child_count[k])/valid_right_size;
+                        valid_right_gini -= tmp*tmp;
                         if(child_count[k] > valid_left_max){
                             valid_left_max = child_count[k];
                             valid_left_label = k;
@@ -1825,8 +1851,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     int last_k_left_valid_count = valid_left_size - cum_valid_child_count;
                     int last_k_right_train_count = train_count[J-1] - last_k_left_train_count;
                     int last_k_right_valid_count = valid_count[J-1] - last_k_left_valid_count;
-                    train_left_gini -= (1.0*last_k_left_train_count/train_left_size)*(1.0*last_k_left_train_count/train_left_size);
-                    train_right_gini -= (1.0*last_k_right_train_count/train_right_size)*(1.0*last_k_right_train_count/train_right_size);
+                    tmp = (double)last_k_left_train_count/train_left_size;
+                    train_left_gini -= tmp*tmp;
+                    tmp = (double)last_k_right_train_count/train_right_size;
+                    train_right_gini -= tmp*tmp;
                     if(last_k_left_train_count > train_left_max){
                         train_left_max = last_k_left_train_count;
                         train_left_label = J-1;
@@ -1835,8 +1863,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                         train_right_max = last_k_right_train_count;
                         train_right_label = J-1;
                     }
-                    valid_left_gini -= (1.0*last_k_left_valid_count/valid_left_size)*(1.0*last_k_left_valid_count/valid_left_size);
-                    valid_right_gini -= (1.0*last_k_right_valid_count/valid_right_size)*(1.0*last_k_right_valid_count/valid_right_size);
+                    tmp = (double)last_k_left_valid_count/valid_left_size;
+                    valid_left_gini -= tmp*tmp;
+                    tmp = (double)last_k_right_valid_count/valid_right_size;
+                    valid_right_gini -= tmp*tmp;
                     if(last_k_left_valid_count > valid_left_max){
                         valid_left_max = last_k_left_valid_count;
                         valid_left_label = J-1;
@@ -1860,8 +1890,8 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     }
                 }
             } else if(var_types[j] == 'f'){
-                int n_tabu_levels = 0;
-                int pass = 0;
+                n_tabu_levels = 0;
+                pass = 0;
                 for(int d = 0; d < depth; d++){
                     if(path_var[d] == j){
                         pass = 1; 
@@ -1895,18 +1925,14 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                 for(int t = 0; t < a_few; t++){
                     split_index = candidate_index[n_tabu_levels + t];
 
-                    double train_left_gini;
-                    double train_right_gini;
-                    double valid_left_gini;
-                    double valid_right_gini;
                     for(int i = 0; i < n_useful_blocks; i++){
                         z4[i] = useful_cur[i] & bx[j][split_index][uindex[i]];
                     }
                     // use first half to train, second half to validate
-                    int train_left_size = count1s(z4, n_train_blocks, n_discard_bits);
-                    int train_right_size = nobs_train - train_left_size;
-                    int valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks, n_discard_bits);
-                    int valid_right_size = nobs_valid - valid_left_size;
+                    train_left_size = count1s(z4, n_train_blocks);
+                    train_right_size = nobs_train - train_left_size;
+                    valid_left_size = count1s(z4+n_train_blocks, n_valid_blocks);
+                    valid_right_size = nobs_valid - valid_left_size;
 
                     if(train_left_size < min_node_size || train_right_size < min_node_size
                         || valid_left_size < min_node_size || valid_right_size < min_node_size){
@@ -1932,10 +1958,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                             z3[i] = ymat[k][uindex[i]] & z4[i];
                         }
                         // get train part
-                        child_count[k] = count1s(z3, n_train_blocks, n_discard_bits);
+                        child_count[k] = count1s(z3, n_train_blocks);
                         cum_train_child_count += child_count[k];
-                        train_left_gini -= (1.0*child_count[k]/train_left_size)*(1.0*child_count[k]/train_left_size);
-                        train_right_gini -= (1.0*(train_count[k] - child_count[k])/train_right_size)*(1.0*(train_count[k] - child_count[k])/train_right_size);
+                        tmp = (double)child_count[k]/train_left_size;
+                        train_left_gini -= tmp*tmp;
+                        tmp = (double)(train_count[k] - child_count[k])/train_right_size;
+                        train_right_gini -= tmp*tmp;
                         if(child_count[k] > train_left_max){
                             train_left_max = child_count[k];
                             train_left_label = k;
@@ -1945,10 +1973,12 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                             train_right_label = k;
                         }
                         // get valid part
-                        child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks, n_discard_bits);
+                        child_count[k] = count1s(z3+n_train_blocks, n_valid_blocks);
                         cum_valid_child_count += child_count[k];
-                        valid_left_gini -= (1.0*child_count[k]/valid_left_size)*(1.0*child_count[k]/valid_left_size);
-                        valid_right_gini -= (1.0*(valid_count[k] - child_count[k])/valid_right_size)*(1.0*(valid_count[k] - child_count[k])/valid_right_size);
+                        tmp = (double)child_count[k]/valid_left_size;
+                        valid_left_gini -= tmp*tmp;
+                        tmp = (double)(valid_count[k] - child_count[k])/valid_right_size;
+                        valid_right_gini -= tmp*tmp;
                         if(child_count[k] > valid_left_max){
                             valid_left_max = child_count[k];
                             valid_left_label = k;
@@ -1963,8 +1993,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                     int last_k_left_valid_count = valid_left_size - cum_valid_child_count;
                     int last_k_right_train_count = train_count[J-1] - last_k_left_train_count;
                     int last_k_right_valid_count = valid_count[J-1] - last_k_left_valid_count;
-                    train_left_gini -= (1.0*last_k_left_train_count/train_left_size)*(1.0*last_k_left_train_count/train_left_size);
-                    train_right_gini -= (1.0*last_k_right_train_count/train_right_size)*(1.0*last_k_right_train_count/train_right_size);
+                    tmp = (double)last_k_left_train_count/train_left_size;
+                    train_left_gini -= tmp*tmp;
+                    tmp = (double)last_k_right_train_count/train_right_size;
+                    train_right_gini -= tmp*tmp;
                     if(last_k_left_train_count > train_left_max){
                         train_left_max = last_k_left_train_count;
                         train_left_label = J-1;
@@ -1973,8 +2005,10 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
                         train_right_max = last_k_right_train_count;
                         train_right_label = J-1;
                     }
-                    valid_left_gini -= (1.0*last_k_left_valid_count/valid_left_size)*(1.0*last_k_left_valid_count/valid_left_size);
-                    valid_right_gini -= (1.0*last_k_right_valid_count/valid_right_size)*(1.0*last_k_right_valid_count/valid_right_size);
+                    tmp = (double)last_k_left_valid_count/valid_left_size;
+                    valid_left_gini -= tmp*tmp;
+                    tmp = (double)last_k_right_valid_count/valid_right_size;
+                    valid_right_gini -= tmp*tmp;
                     if(last_k_left_valid_count > valid_left_max){
                         valid_left_max = last_k_left_valid_count;
                         valid_left_label = J-1;
@@ -2008,7 +2042,7 @@ void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_n
 // fill the array with n index numbers independently sampled from [0,1,..., n-1]
 void bootstrap_index_array(int n, int *array){
     for(int i = 0; i < n; i++){
-        array[i] = (int)floor(unif_rand()*n);
+        array[i] = rand() % n;
     }
 }
 
@@ -2018,7 +2052,6 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
     int *n_bcols = model->n_bcols;
     char *var_types = model->var_types;
     int n_blocks = bxall->n_blocks;
-    int n_discard_bits = bxall->n_discard_bits;
     int p = model->p;
     int J = yc->nlevels;
     bitblock_t **ymat = yc->ymat;
@@ -2164,7 +2197,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
                 for(int i = 0; i < n_useful_blocks; i++){
                     z4[i] = ymat[k][uindex[i]] & useful_cur[i];
                 }
-                cur_node->count[k] = count1s(z4, n_useful_blocks, n_discard_bits);
+                cur_node->count[k] = count1s(z4, n_useful_blocks);
             }
             cur_node->split_var = 0;
             cur_node->split_bx = 0;
@@ -2214,7 +2247,7 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
                 for(int i=0; i < n_useful_blocks; i++){
                     z4[i] = ymat[k][uindex[i]] & useful_cur[i];
                 }
-                cur_node->count[k] = count1s(z4, n_useful_blocks, n_discard_bits);
+                cur_node->count[k] = count1s(z4, n_useful_blocks);
             }
             cur_node->split_var = 0;
             cur_node->split_bx = 0;
@@ -2659,6 +2692,10 @@ void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int
     if((*model)->ntrees > 0){
         //printf("Model already contains a forest.\n");
         return;
+    }
+    if(!lookup_initialized){
+        fillSetBitTable(SetBitTable, LOOKUP);
+        lookup_initialized = 1;
     }
     // initialize RNG
     /*

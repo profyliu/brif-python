@@ -5,7 +5,6 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
-#include <assert.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -165,6 +164,7 @@ typedef struct {
     void **data;
 } data_frame_t;
 
+void fillSetBitTable(unsigned char table[], int n);
 dt_node_t* newNode(dt_node_t* parent, int J, unsigned branch);
 void deleteTree(dt_node_t* root);
 void deleteLeaves(dt_leaf_t* root);
@@ -213,7 +213,7 @@ ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integ
 ycode_t * copy_ycode(ycode_t * yc);
 
 int countSetBits(bitblock_t n);
-int count1s(bitblock_t *x, int n_blocks, int n_discard_bits);
+int count1s(bitblock_t *x, int n_blocks);
 void shuffle_array_first_ps(int *arr, int n, int ps);
 void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_node_size, int split_search, dt_node_t * cur_node, bitblock_t *useful_cur, int *uindex, int n_useful_blocks, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *train_count, int *valid_count, int search_radius, int *candidate_index, int *split_var, int* split_bx);
 void bootstrap_index_array(int n, int *array);
@@ -235,7 +235,6 @@ void flatten_tree(dt_node_t *tree, dt_leaf_t **leaves, int J);
 void flatten_model(rf_model_t **model, int nthreads);
 void printTree(dt_node_t * tree, unsigned indent, int J);
 void fill_name_addr_array(fnode_t *tree, char **name, int start_index);
-//void printRules(rf_model_t *model, int which_tree);
 unsigned long urand(void);
 double unif_rand(void);
-//data_frame_t *get_data(char inputfile[], rf_model_t **model, int n, int p, int X_only);
+
