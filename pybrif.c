@@ -247,7 +247,7 @@ static PyObject *py_fit(PyObject *self, PyObject *args){
     if(ps <= 0){
         ps = (int)(round(sqrt(model->p)));
     }
-    build_forest(bx_train, yc_train, &model, ps, max_depth, min_node_size, ntrees, nthreads, bagging_method, bagging_proportion, split_search, search_radius, seed);
+    build_forest(bx_train, yc_train, &model, ps, max_depth, min_node_size, ntrees, nthreads, seed);
     flatten_model(&model, nthreads);
     delete_bx(bx_train, model);
     delete_yc(yc_train);

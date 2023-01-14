@@ -164,7 +164,12 @@ typedef struct {
     void **data;
 } data_frame_t;
 
-
+factor_t * create_factor(int n);
+factor_t * copy_factor(int n, factor_t * fm);
+void delete_factor(factor_t * f);
+void add_element(factor_t *f, int index, char *name);
+void find_add_element(factor_t *f, int index, char *name);
+rf_model_t *create_empty_model(void);
 
 void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_method, int nthreads);
 

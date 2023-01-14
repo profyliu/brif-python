@@ -1,6 +1,62 @@
 #include "brif.h"
 #define LOOKUP 65536
 
+
+void fillSetBitTable(unsigned char table[], int n);
+dt_node_t* newNode(dt_node_t* parent, int J, unsigned branch);
+void deleteTree(dt_node_t* root);
+void deleteLeaves(dt_leaf_t* root);
+void set_default_params(param_t *param);
+integer_linked_list_t * create_int_list(integer_t val);
+void add_int_next(integer_linked_list_t **list, integer_t val);
+void delete_int_list(integer_linked_list_t **list);
+numeric_linked_list_t * create_num_list(numeric_t val);
+void add_num_next(numeric_linked_list_t **list, numeric_t val);
+void delete_num_list(numeric_linked_list_t **list);
+int insert_node(fnode_t **tree, char *name, int n);
+int check_value(fnode_t *tree, char *name, int val);
+int find_value(fnode_t *tree, char *name);
+void fill_name_array(fnode_t *tree, char **name, int start_index);
+void copy_tree(fnode_t **newtree, fnode_t *tree);
+void delete_tree(fnode_t *tree);
+int cmpfunc_ptr_integer_t(const void *v1, const void *v2);
+int cmpfunc_ptr_numeric_t(const void *v1, const void *v2);
+numeric_t * numeric_cutpoints(numeric_t *x, int n, int *n_cuts);
+integer_t * integer_cutpoints(integer_t *x, int n, int *n_cuts);
+numeric_t * numeric_cutpoints_2(numeric_t *x, int n, int *n_cuts, int *yindex, int J, int start_index);
+integer_t * integer_cutpoints_2(integer_t *x, int n, int *n_cuts, int *yindex, int J, int start_index);
+
+// set the k-th bit from left of x 
+void set_bit(bitblock_t *x, int k);
+
+bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_blocks, int n_cuts, int nthreads);
+bitblock_t ** binarize_factor_index(int *index, int n, int n_blocks, int n_levels, int start_index, int nthreads);
+factor_t * factor_cutpoints(factor_t *f, int n, int *n_cuts);
+bitblock_t ** binarize_factor(factor_t *f, int n, int n_blocks, int *n_cuts, int nthreads);
+bitblock_t ** binarize_integer(integer_t *x, integer_t *cuts, int n, int n_blocks, int n_cuts, int nthreads);
+
+void delete_bmat(bitblock_t **bmat, int ncol);
+
+ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integer_classes, int nthreads);
+ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer_classes, int nthreads);
+ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integer_classes, int nthreads);
+
+// copy yc ignoring ymat
+ycode_t * copy_ycode(ycode_t * yc);
+
+int countSetBits(bitblock_t n);
+int count1s(bitblock_t *x, int n_blocks);
+void shuffle_array_first_ps(int *arr, int n, int ps);
+void find_best_split(rf_model_t *model, bitblock_t ***bx, bitblock_t **ymat, int J, int min_node_size, dt_node_t * cur_node, bitblock_t *cur, int n_blocks, int *uindex, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *candidate_index, int *split_var, int* split_bx);
+void bootstrap_index_array(int n, int *array);
+dt_node_t* build_tree(rf_model_t *model, bitblock_t ***bx, bitblock_t **ymat, int n_blocks, int J, int ps, int max_depth, int min_node_size,
+                      int *child_count, int *count, bitblock_t *cur, bitblock_t *useful_cur, bitblock_t *z3, bitblock_t *z4);
+void flatten_tree(dt_node_t *tree, dt_leaf_t **leaves, int J);
+void printTree(dt_node_t * tree, unsigned indent, int J);
+double unif_rand(void);
+
+
+
 int lookup_initialized = 0;
 unsigned char SetBitTable[LOOKUP] = {0};
 
@@ -2029,7 +2085,7 @@ void fill_name_addr_array(fnode_t *tree, char **name, int start_index){
     }
 }
 
-/*
+
 void printRules(rf_model_t *model, int which_tree){
     if(which_tree > ((model->ntrees)-1)) return;
     dt_leaf_t * lf = model->tree_leaves[which_tree];
@@ -2272,4 +2328,3 @@ data_frame_t *get_data(char inputfile[], rf_model_t **model, int n, int p, int X
     df->data = data;
     return(df);
 }
-*/
