@@ -177,7 +177,7 @@ void make_cuts(data_frame_t *train, rf_model_t **model, int n_numeric_cuts, int 
 bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model, int nthreads);
 void delete_bx(bx_info_t *bxall, rf_model_t *model);
 ycode_t * make_yc(data_frame_t *train, rf_model_t **model, int max_integer_classes, int nthreads);
-void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads,  int seed);
+void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads, int seed);
 
 void flatten_model(rf_model_t **model, int nthreads);
 
