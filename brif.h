@@ -33,7 +33,7 @@ typedef int INT;
 #define LEFT 0
 #define RIGHT 1
 #define MAXDEPTH 40
-#define MAXNODES 1000
+#define MAXNODES 5000
 #define MAXBITBLOCK_VALUE UINT_MAX
 #define INTEGER_T_MIN INT_MIN
 #define INTEGER_T_MAX INT_MAX
@@ -164,77 +164,50 @@ typedef struct {
     void **data;
 } data_frame_t;
 
-void fillSetBitTable(unsigned char table[], int n);
-dt_node_t* newNode(dt_node_t* parent, int J, unsigned branch);
-void deleteTree(dt_node_t* root);
-void deleteLeaves(dt_leaf_t* root);
-void set_default_params(param_t *param);
-integer_linked_list_t * create_int_list(integer_t val);
-void add_int_next(integer_linked_list_t **list, integer_t val);
-void delete_int_list(integer_linked_list_t **list);
-numeric_linked_list_t * create_num_list(numeric_t val);
-void add_num_next(numeric_linked_list_t **list, numeric_t val);
-void delete_num_list(numeric_linked_list_t **list);
-int insert_node(fnode_t **tree, char *name, int n);
-int check_value(fnode_t *tree, char *name, int val);
-int find_value(fnode_t *tree, char *name);
-void fill_name_array(fnode_t *tree, char **name, int start_index);
-factor_t * create_factor(int n);
-void copy_tree(fnode_t **newtree, fnode_t *tree);
-factor_t * copy_factor(int n, factor_t * fm);
-void add_element(factor_t *f, int index, char *name);
-void find_add_element(factor_t *f, int index, char *name);
-void delete_tree(fnode_t *tree);
-void delete_factor(factor_t * f);
 
-int cmpfunc_ptr_integer_t(const void *v1, const void *v2);
-int cmpfunc_ptr_numeric_t(const void *v1, const void *v2);
-numeric_t * numeric_cutpoints(numeric_t *x, int n, int *n_cuts);
-integer_t * integer_cutpoints(integer_t *x, int n, int *n_cuts);
-numeric_t * numeric_cutpoints_2(numeric_t *x, int n, int *n_cuts, int *yindex, int J, int start_index);
-integer_t * integer_cutpoints_2(integer_t *x, int n, int *n_cuts, int *yindex, int J, int start_index);
 
-// set the k-th bit from left of x 
-void set_bit(bitblock_t *x, int k);
+#ifdef _WIN32
+__declspec(dllexport) void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_method, int nthreads);
 
-bitblock_t ** binarize_numeric(numeric_t *x, numeric_t *cuts, int n, int n_blocks, int n_cuts, int nthreads);
-bitblock_t ** binarize_factor_index(int *index, int n, int n_blocks, int n_levels, int start_index, int nthreads);
-factor_t * factor_cutpoints(factor_t *f, int n, int *n_cuts);
-bitblock_t ** binarize_factor(factor_t *f, int n, int n_blocks, int *n_cuts, int nthreads);
-bitblock_t ** binarize_integer(integer_t *x, integer_t *cuts, int n, int n_blocks, int n_cuts, int nthreads);
+__declspec(dllexport) void get_numeric_summary(numeric_t *vector, int n, numeric_t *min_val, numeric_t *max_val, numeric_t *avg_val);
+__declspec(dllexport) void get_integer_summary(integer_t *vector, int n, integer_t *min_val, integer_t *max_val, numeric_t *avg_val);
+__declspec(dllexport) void delete_data(data_frame_t *df);
+__declspec(dllexport) void delete_yc(ycode_t * yc);
+__declspec(dllexport) void delete_model(rf_model_t *model);
+__declspec(dllexport) void make_cuts(data_frame_t *train, rf_model_t **model, int n_numeric_cuts, int n_integer_cuts);
+__declspec(dllexport) bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model, int nthreads);
+__declspec(dllexport) void delete_bx(bx_info_t *bxall, rf_model_t *model);
+__declspec(dllexport) ycode_t * make_yc(data_frame_t *train, rf_model_t **model, int max_integer_classes, int nthreads);
+__declspec(dllexport) void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads,  int seed);
 
-void delete_bmat(bitblock_t **bmat, int ncol);
+__declspec(dllexport) void flatten_model(rf_model_t **model, int nthreads);
 
-ycode_t * codify_integer_target(integer_t *y, int n, int n_blocks, int max_integer_classes, int nthreads);
-ycode_t * codify_factor_target(factor_t *y, int n, int n_blocks, int max_integer_classes, int nthreads);
-ycode_t * codify_numeric_target(numeric_t *y, int n, int n_blocks, int max_integer_classes, int nthreads);
+__declspec(dllexport) void fill_name_addr_array(fnode_t *tree, char **name, int start_index);
 
-// copy yc ignoring ymat
-ycode_t * copy_ycode(ycode_t * yc);
+__declspec(dllexport) void printRules(rf_model_t *model, int which_tree);
+__declspec(dllexport) data_frame_t *get_data(char inputfile[], rf_model_t **model, int n, int p, int X_only);
+__declspec(dllexport) void build_forest_cuda(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads, int blocksize, int seed);
+#else
+extern "C" void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_method, int nthreads);
 
-int countSetBits(bitblock_t n);
-int count1s(bitblock_t *x, int n_blocks);
-void shuffle_array_first_ps(int *arr, int n, int ps);
-void find_best_split(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int min_node_size, int split_search, dt_node_t * cur_node, bitblock_t *useful_cur, int *uindex, int n_useful_blocks, int *var_index, int actual_ps, bitblock_t *z3, bitblock_t *z4, int *count, int *child_count, int *train_count, int *valid_count, int search_radius, int *candidate_index, int *split_var, int* split_bx);
-void bootstrap_index_array(int n, int *array);
-dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, int max_depth, int min_node_size, int bagging_method, double bagging_proportion, int split_search, int search_radius);
-void predict_leaves(dt_leaf_t *leaves, bitblock_t ***bx, int **pred_tree, int J, int n_blocks);
-void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_method, int nthreads);
-rf_model_t *create_empty_model(void);
-void get_numeric_summary(numeric_t *vector, int n, numeric_t *min_val, numeric_t *max_val, numeric_t *avg_val);
-void get_integer_summary(integer_t *vector, int n, integer_t *min_val, integer_t *max_val, numeric_t *avg_val);
-void delete_data(data_frame_t *df);
-void delete_yc(ycode_t * yc);
-void delete_model(rf_model_t *model);
-void make_cuts(data_frame_t *train, rf_model_t **model, int n_numeric_cuts, int n_integer_cuts);
-bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model, int nthreads);
-void delete_bx(bx_info_t *bxall, rf_model_t *model);
-ycode_t * make_yc(data_frame_t *train, rf_model_t **model, int max_integer_classes, int nthreads);
-void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads, int bagging_method, double bagging_proportion, int split_search, int search_radius, int seed);
-void flatten_tree(dt_node_t *tree, dt_leaf_t **leaves, int J);
-void flatten_model(rf_model_t **model, int nthreads);
-void printTree(dt_node_t * tree, unsigned indent, int J);
-void fill_name_addr_array(fnode_t *tree, char **name, int start_index);
-unsigned long urand(void);
-double unif_rand(void);
+extern "C" void get_numeric_summary(numeric_t *vector, int n, numeric_t *min_val, numeric_t *max_val, numeric_t *avg_val);
+extern "C" void get_integer_summary(integer_t *vector, int n, integer_t *min_val, integer_t *max_val, numeric_t *avg_val);
+extern "C" void delete_data(data_frame_t *df);
+extern "C" void delete_yc(ycode_t * yc);
+extern "C" void delete_model(rf_model_t *model);
+extern "C" void make_cuts(data_frame_t *train, rf_model_t **model, int n_numeric_cuts, int n_integer_cuts);
+extern "C" bx_info_t * make_bx(data_frame_t * train, rf_model_t ** model, int nthreads);
+extern "C" void delete_bx(bx_info_t *bxall, rf_model_t *model);
+extern "C" ycode_t * make_yc(data_frame_t *train, rf_model_t **model, int max_integer_classes, int nthreads);
+extern "C" void build_forest(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads,  int seed);
+
+extern "C" void flatten_model(rf_model_t **model, int nthreads);
+
+extern "C" void fill_name_addr_array(fnode_t *tree, char **name, int start_index);
+
+extern "C" void printRules(rf_model_t *model, int which_tree);
+extern "C" data_frame_t *get_data(char inputfile[], rf_model_t **model, int n, int p, int X_only);
+extern "C" void build_forest_cuda(bx_info_t *bxall, ycode_t *yc, rf_model_t **model, int ps, int max_depth, int min_node_size, int ntrees, int nthreads, int blocksize, int seed);
+#endif
+
 
