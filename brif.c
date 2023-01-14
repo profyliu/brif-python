@@ -1494,38 +1494,6 @@ dt_node_t* build_tree(bx_info_t *bxall, ycode_t *yc, rf_model_t *model, int ps, 
 }
 
 
-void predict_leaves(dt_leaf_t *leaves, bitblock_t ***bx, int **pred_tree, int J, int n_blocks){
-    if(leaves){
-        int i;
-        #pragma omp parallel for 
-        for(i = 0; i < n_blocks; i++){
-            bitblock_t test0 = MAXBITBLOCK_VALUE;
-            for(int d = 0; d < leaves->depth; d++){
-                int this_var = leaves->rulepath_var[d];
-                int this_bx = leaves->rulepath_bx[d];
-                if(this_var > 0){
-                    test0 &= bx[this_var][this_bx][i];
-                } else if(this_var < 0){
-                    test0 &= ~bx[-this_var][this_bx][i];
-                } else {
-                    //printf("Impossible\n");
-                }
-            }
-            // set score for the block
-            unsigned bit = 0;
-            for(unsigned k = 1 << (8*sizeof(bitblock_t) - 1); k > 0; k = k / 2){
-                if(test0 & k){
-                    for(int j = 0; j < J; j++){
-                        pred_tree[j][i*8*sizeof(bitblock_t)+bit] = leaves->count[j];
-                    }
-                }
-                bit++;
-            }
-        }
-        predict_leaves(leaves->next, bx, pred_tree, J, n_blocks);
-    }
-}
-
 
 void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_method, int nthreads){    
     if(model == NULL || model->ntrees == 0) return;
@@ -1546,7 +1514,36 @@ void predict(rf_model_t *model, bx_info_t * bx_new, double **pred, int vote_meth
     }
 
     for(int t = 0; t < model->ntrees; t++){
-        predict_leaves(model->tree_leaves[t], bx, pred_tree, J, n_blocks);
+        dt_leaf_t *leaves = model->tree_leaves[t];
+        while(leaves){
+            int i;
+            #pragma omp parallel for 
+            for(i = 0; i < n_blocks; i++){
+                bitblock_t test0 = MAXBITBLOCK_VALUE;
+                for(int d = 0; d < leaves->depth; d++){
+                    int this_var = leaves->rulepath_var[d];
+                    int this_bx = leaves->rulepath_bx[d];
+                    if(this_var > 0){
+                        test0 &= bx[this_var][this_bx][i];
+                    } else if(this_var < 0){
+                        test0 &= ~bx[-this_var][this_bx][i];
+                    } else {
+                        //printf("Impossible\n");
+                    }
+                }
+                // set score for the block
+                unsigned bit = 0;
+                for(bitblock_t k = 1 << (8*sizeof(bitblock_t) - 1); k > 0; k >>= 1){
+                    if(test0 & k){
+                        for(int j = 0; j < J; j++){
+                            pred_tree[j][i*8*sizeof(bitblock_t)+bit] = leaves->count[j];
+                        }
+                    }
+                    bit++;
+                }
+            }
+            leaves = leaves->next;
+        } 
 
         if(vote_method == 0){
             int i;
