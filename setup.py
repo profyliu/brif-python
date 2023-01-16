@@ -13,7 +13,7 @@ else:
     extra_link = []
 
 setup(name='brif',
-      version="1.4.3",
+      version="1.4.4",
       description = "Build decision trees and random forests for classification and regression.",
       author = 'Yanchao Liu',
       author_email = 'yanchaoliu@wayne.edu',
